@@ -90,8 +90,16 @@ async def ask_llm(messages):
         "max_tokens": 250,
         "chat_template_kwargs": {"enable_thinking": False},  # trained to answer directly
     }
+    # A scale-to-zero server answers 503 "Loading model" while it boots: keep retrying for ~3 min
+    # (the user just sees "typing…") instead of failing on the first try.
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + 180
     async with llm_slots:
-        r = await http.post(f"{LLM_URL}/chat/completions", json=payload)
+        while True:
+            r = await http.post(f"{LLM_URL}/chat/completions", json=payload)
+            if r.status_code not in (502, 503, 504) or loop.time() > deadline:
+                break
+            await asyncio.sleep(5)
     r.raise_for_status()
     text = r.json()["choices"][0]["message"]["content"] or ""
     return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
