@@ -1,5 +1,5 @@
 """
-modal_llama.py: serve VIT Bot on Modal with llama.cpp on a T4 GPU, scaling to zero when idle.
+modal_llama.py: serve VIT Bot on Modal with llama.cpp on a small GPU (T4, else L4/A10G), scaling to zero when idle.
 
     modal secret create vit-bot-llm LLM_API_KEY=<random string>   # once
     modal deploy deploy/modal_llama.py
@@ -37,11 +37,16 @@ image = (
 
 app = modal.App("vit-bot")
 
+# CUDA JIT-compiles llama.cpp's GPU kernels on first use, which cost ~2 minutes per fresh
+# container. Keeping the compute cache on a Volume makes that a one-time cost.
+cuda_cache = modal.Volume.from_name("vit-bot-cuda-cache", create_if_missing=True)
+
 
 @app.function(
     image=image,
-    gpu="T4",
+    gpu=["T4", "L4", "A10G"],  # cheapest first; falls back when T4 capacity is short
     secrets=[modal.Secret.from_name("vit-bot-llm")],
+    volumes={"/cache": cuda_cache},
     max_containers=1,
     scaledown_window=300,
     timeout=600,
@@ -49,6 +54,9 @@ app = modal.App("vit-bot")
 @modal.concurrent(max_inputs=4)
 @modal.web_server(port=8080, startup_timeout=300)
 def serve():
+    os.makedirs("/cache/cuda", exist_ok=True)
+    os.environ["CUDA_CACHE_PATH"] = "/cache/cuda"
+    os.environ["CUDA_CACHE_MAXSIZE"] = str(4 << 30)
     subprocess.Popen([
         "llama-server",
         "-m", f"/models/{GGUF}",
