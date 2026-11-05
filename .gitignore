@@ -11,3 +11,4 @@ unsloth_compiled_cache/
 HANDOFF.md
 *.gguf
 .env
+.claude/
