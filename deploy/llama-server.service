@@ -1,0 +1,19 @@
+[Unit]
+Description=llama.cpp server for VIT Bot (Qwen3.5-4B Q4_K_M + VIT Bot LoRA)
+After=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/vitbot
+# Listens on localhost only: the bot is the sole client, nothing is exposed to the internet.
+ExecStart=/home/ubuntu/vitbot/llama/llama-server \
+  -m models/Qwen3.5-4B-Q4_K_M.gguf \
+  --lora models/vit-bot-lora-f16.gguf \
+  --host 127.0.0.1 --port 8080 \
+  -c 4096 -np 1 -t 4 \
+  --jinja --reasoning-budget 0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

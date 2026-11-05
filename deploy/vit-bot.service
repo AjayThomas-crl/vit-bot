@@ -1,0 +1,15 @@
+[Unit]
+Description=VIT Bot Telegram frontend
+After=network-online.target llama-server.service
+Wants=llama-server.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/vitbot
+EnvironmentFile=/home/ubuntu/vitbot/.env
+ExecStart=/home/ubuntu/vitbot/.venv/bin/python bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

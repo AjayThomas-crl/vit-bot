@@ -1,0 +1,13 @@
+data/
+.venv/
+__pycache__/
+kaggle/vit-bot-data/
+outputs/
+exports/
+tools/
+logs/
+docs/
+unsloth_compiled_cache/
+HANDOFF.md
+*.gguf
+.env

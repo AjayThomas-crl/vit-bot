@@ -1,0 +1,2 @@
+requests>=2.28
+scikit-learn>=1.2   # optional: only for auto-discovered topic clusters in explore.py
