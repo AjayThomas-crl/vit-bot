@@ -194,7 +194,12 @@ async def plain_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
-    app = Application.builder().token(TOKEN).concurrent_updates(True).build()
+    # Generous Telegram API timeouts: free hosts can be slow to connect right after waking.
+    app = (
+        Application.builder().token(TOKEN).concurrent_updates(True)
+        .connect_timeout(30).read_timeout(30).write_timeout(30)
+        .build()
+    )
     app.add_handler(CommandHandler(["start", "help"], start))
     app.add_handler(CommandHandler("stop", stop_game))
     app.add_handler(CommandHandler(list(MODES), mode_command))
@@ -212,10 +217,11 @@ def main():
             webhook_url=f"{public_url.rstrip('/')}/telegram",
             secret_token=os.environ.get("WEBHOOK_SECRET"),  # rejects POSTs that don't come from Telegram
             allowed_updates=Update.ALL_TYPES,
+            bootstrap_retries=5,  # retry get_me/setWebhook instead of crashing on one timeout
         )
     else:
         log.info("VIT Bot polling, LLM at %s", LLM_URL)
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
+        app.run_polling(allowed_updates=Update.ALL_TYPES, bootstrap_retries=5)
 
 
 if __name__ == "__main__":
