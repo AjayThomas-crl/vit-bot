@@ -10,6 +10,8 @@ Env vars:
   LLM_MODEL        default vit-bot (llama-server ignores it; LM Studio needs the model id)
   LLM_API_KEY      sent as a Bearer token when set (llama-server --api-key, e.g. the Modal deploy)
   MAX_PARALLEL     simultaneous model calls, default 1 (CPU servers: keep it low, others queue)
+  WEBHOOK_URL      public base URL; switches to webhook mode (Render sets RENDER_EXTERNAL_URL itself)
+  WEBHOOK_SECRET   checked on every webhook POST so only Telegram can call it
 
 How it works: long polling (the bot asks Telegram for new messages), so the server needs no
 open ports or domain. Each mode is one of the exact system prompts the model was trained on.
@@ -197,8 +199,23 @@ def main():
     app.add_handler(CommandHandler("stop", stop_game))
     app.add_handler(CommandHandler(list(MODES), mode_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, plain_message))
-    log.info("VIT Bot polling, LLM at %s", LLM_URL)
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+    # Webhook mode on hosts that sleep when idle (Render free web services set
+    # RENDER_EXTERNAL_URL): Telegram's POST wakes the service. Otherwise long polling.
+    public_url = os.environ.get("WEBHOOK_URL") or os.environ.get("RENDER_EXTERNAL_URL")
+    if public_url:
+        log.info("VIT Bot webhook at %s/telegram, LLM at %s", public_url, LLM_URL)
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.environ.get("PORT", "10000")),
+            url_path="telegram",
+            webhook_url=f"{public_url.rstrip('/')}/telegram",
+            secret_token=os.environ.get("WEBHOOK_SECRET"),  # rejects POSTs that don't come from Telegram
+            allowed_updates=Update.ALL_TYPES,
+        )
+    else:
+        log.info("VIT Bot polling, LLM at %s", LLM_URL)
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
