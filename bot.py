@@ -8,6 +8,7 @@ Env vars:
   TELEGRAM_TOKEN   from @BotFather (required)
   LLM_URL          default http://127.0.0.1:8080/v1   (LM Studio: http://127.0.0.1:1234/v1)
   LLM_MODEL        default vit-bot (llama-server ignores it; LM Studio needs the model id)
+  LLM_API_KEY      sent as a Bearer token when set (llama-server --api-key, e.g. the Modal deploy)
   MAX_PARALLEL     simultaneous model calls, default 1 (CPU servers: keep it low, others queue)
 
 How it works: long polling (the bot asks Telegram for new messages), so the server needs no
@@ -27,6 +28,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 TOKEN = os.environ["TELEGRAM_TOKEN"]
 LLM_URL = os.environ.get("LLM_URL", "http://127.0.0.1:8080/v1").rstrip("/")
 LLM_MODEL = os.environ.get("LLM_MODEL", "vit-bot")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 MAX_PARALLEL = int(os.environ.get("MAX_PARALLEL", "1"))
 REDTAG_MAX_TURNS = 8
 
@@ -73,7 +75,8 @@ CRISIS_REPLY = (
 games = {}                    # (chat_id, user_id) -> list of redtag messages
 pending_mode = {}             # (chat_id, user_id) -> mode chosen with an empty command
 llm_slots = asyncio.Semaphore(MAX_PARALLEL)
-http = httpx.AsyncClient(timeout=180)
+# 180 s covers a cold start on scale-to-zero hosts like Modal.
+http = httpx.AsyncClient(timeout=180, headers={"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else None)
 
 
 async def ask_llm(messages):
